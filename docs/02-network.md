@@ -1,1 +1,25 @@
+# Network Architecture
+
+## Laboratory Network Topology
+
+```mermaid
+flowchart TB
+    subgraph LAPTOP["Laptop fizyczny — Windows"]
+        subgraph VB["Oracle VirtualBox"]
+            WIN11["VM: win11-siemens<br/>Windows 11"]
+            TIA["TIA Portal V18"]
+            WIN11 --- TIA
+            NIC["VirtualBox NIC 1<br/>Bridged"]
+            WIN11 --- NIC
+        end
+        USB["TP-LINK Gigabit Ethernet USB Adapter"]
+        NIC --- USB
+    end
+
+    USB <-->|Ethernet| SW["Moxa EDS-205"]
+
+    SW <-->|Ethernet| RPI["Raspberry Pi 5<br/>ESXi on Arm Fling"]
+    SW <-->|Ethernet| PLC["Siemens S7-1200<br/>CPU 1212C"]
+    SW <-->|Ethernet| HMI["Siemens KTP600 Basic PN"]
+```
 

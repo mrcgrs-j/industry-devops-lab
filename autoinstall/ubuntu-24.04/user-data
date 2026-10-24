@@ -1,1 +1,25 @@
+#cloud-config
+autoinstall:
+  version: 1
 
+  locale: en_US.UTF-8
+
+  keyboard:
+    layout: us
+
+  identity:
+    hostname: tf-dr-test-01
+    username: devops
+    password: "$6$REPLACE_WITH_GENERATED_PASSWORD_HASH"
+
+  ssh:
+    install-server: true
+    allow-pw: false
+    authorized-keys:
+      - "REPLACE_WITH_YOUR_SSH_PUBLIC_KEY"
+
+  storage:
+    layout:
+      name: direct
+
+  updates: security

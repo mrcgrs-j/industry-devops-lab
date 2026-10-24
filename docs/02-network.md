@@ -83,6 +83,7 @@ flowchart TB
 | Network | `172.16.10.0` | `255.255.255.0` | Defined for documentation |
 | Laptop / ICS interface | `172.16.10.1` | `255.255.255.0` | Previously reported |
 | ESXi management | `172.16.10.2` | `255.255.255.0` | Previously reported |
+| Windows 11 VM — win11-devops | `172.16.10.5` | Verify | Previously reported |
 | Windows 11 VM — win11-siemens, TIA Portal V18 | `172.16.10.6` | Verify | Previously reported |
 | Siemens S7-1200 PLC | `172.16.10.7` | `255.255.255.0` | Confirmed in TIA Portal |
 | Siemens KTP600 HMI | `172.16.10.8` | `255.255.255.0` | Confirmed in TIA Portal |

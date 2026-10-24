@@ -1,4 +1,4 @@
-<img width="1828" height="931" alt="image" src="https://github.com/user-attachments/assets/6ed00ec2-6363-4ce6-a538-54dc2b525bdd" />
+<img width="1835" height="927" alt="image" src="https://github.com/user-attachments/assets/2b32d1b0-d9bd-4b3e-9577-19504ef43e9c" />
 
 # Industry DevOps Lab
 

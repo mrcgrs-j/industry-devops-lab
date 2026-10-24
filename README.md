@@ -1,5 +1,7 @@
+<img width="1806" height="680" alt="image" src="https://github.com/user-attachments/assets/0c7b8fbc-24a4-4869-89ef-24477c9b6bb3" />
+
+
 # Industry DevOps Lab
-![Uploading image.png…]()
 
 **Industrial Automation · OT/IT Integration · DevOps · Cloud · Data Engineering**
 

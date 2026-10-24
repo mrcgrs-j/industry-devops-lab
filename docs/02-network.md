@@ -1,151 +1,238 @@
 # Network Configuration
 
-## 1. Overview
+## Network overview
 
-The `industry-devops-lab` project uses a dedicated Ethernet laboratory network for communication between the industrial devices, the virtualization host and the engineering workstations.
+The intended topology is one shared Ethernet LAN for engineering access, the PLC/HMI and the ESXi host. No VLAN segmentation is currently documented.
 
-The laboratory subnet is:
+| Parameter | Value | Status |
+|---|---|---|
+| Network | `172.16.10.0/24` | Intended; verify actual masks on every device |
+| Subnet mask | `255.255.255.0` | Confirmed for PLC and HMI in TIA Portal |
+| Gateway | `172.16.10.1` | Previously reported for laptop/ICS; verify current routing |
+| Industrial switch | Moxa EDS-205 | Model reported |
+| VLANs | None configured | Current design |
+| Engineering software | TIA Portal V18 inside Windows 11 VM | Reported |
+| VirtualBox mode for `win11-siemens` | Bridged Adapter | Previously documented |
+| VirtualBox mode for `win11-devops` | Bridged Adapter + NAT | Tested |
+| Bridged host interface | TP-LINK Gigabit Ethernet USB Adapter | Previously documented for `win11-siemens`; verify if needed |
 
-- **Network:** `172.16.10.0/24`
-- **Subnet mask:** `255.255.255.0`
-- **VLANs:** None currently configured
-- **Primary purpose:** Industrial communication, laboratory management and access to the virtualization host
+## Logical topology
 
-The network is isolated from direct Internet access through the laboratory router. The `win11-devops` virtual machine therefore uses a second network adapter configured with VirtualBox NAT to access the Internet.
-
-> **Documentation status:** IP addresses and connectivity tests below reflect the currently reported configuration. Details not yet verified are explicitly marked as unverified.
-
-## 2. Network Diagram
+> **Important:** The existing network diagram below is intentionally preserved. The new `win11-devops` VM is documented in a separate section without changing the original topology.
 
 ```mermaid
 flowchart TB
-    subgraph HOST["Physical Computer — Windows"]
-        VB["Oracle VirtualBox"]
+    NET["Shared lab LAN<br/>172.16.10.0/24 — verify masks"]
 
-        subgraph DEVOPS["VM: win11-devops"]
-            OS["Windows 11"]
-            GIT["Git"]
-            VSC["Visual Studio Code"]
-            TF["Terraform CLI"]
-            PS["PowerShell 7"]
-
-            NIC1["Adapter 1: Bridged<br/>USB Ethernet<br/>172.16.10.5/24"]
-            NIC2["Adapter 2: VirtualBox NAT"]
-
-            OS --- GIT
-            OS --- VSC
-            OS --- TF
-            OS --- PS
-            OS --- NIC1
-            OS --- NIC2
-        end
-
-        subgraph SIEMENS["VM: win111-siemens"]
+    subgraph LAPTOP["Physical laptop — Windows host"]
+        USB["TP-LINK Gigabit Ethernet USB Adapter"]
+        subgraph VBOX["Oracle VirtualBox"]
+            WIN11["VM: win11-siemens<br/>Windows 11<br/>IP: 172.16.10.6 — reported"]
             TIA["TIA Portal V18"]
+            NIC["VirtualBox Adapter 1<br/>Bridged"]
+            WIN11 --- TIA
+            WIN11 --- NIC
         end
-
-        VB --- DEVOPS
-        VB --- SIEMENS
+        USB --- NIC
     end
 
-    subgraph LAN["Laboratory Ethernet LAN — 172.16.10.0/24"]
-        ESXI["Raspberry Pi 5<br/>VMware ESXi<br/>172.16.10.2"]
-        DEVOPS_IP["win11-devops<br/>172.16.10.5"]
-        SIEMENS_IP["win111-siemens<br/>172.16.10.6"]
-        PLC["Siemens S7-1200 PLC<br/>172.16.10.7"]
-        HMI["Siemens KTP600 HMI<br/>172.16.10.8"]
+    SW["Moxa EDS-205<br/>5-port unmanaged Ethernet switch"]
 
-        DEVOPS_IP <--> ESXI
-        SIEMENS_IP --- ESXI
-        PLC --- ESXI
-        HMI --- ESXI
+    subgraph AUTOMATION["Industrial automation"]
+        PLC["PLC1 — S7-1200 CPU 1212C DC/DC/DC<br/>IP: 172.16.10.7<br/>Mask: 255.255.255.0"]
+        HMI["HMI1 — KTP600 Basic mono PN<br/>IP: 172.16.10.8<br/>Mask: 255.255.255.0"]
     end
 
-    NIC1 <--> DEVOPS_IP
-    NIC2 --> INTERNET["Internet"]
+    ESXI["Raspberry Pi 5 / ESXi on Arm Fling<br/>Management IP: 172.16.10.2 — verify"]
 
-    classDef verified fill:#d9ead3,stroke:#38761d,color:#000;
-    classDef reported fill:#fff2cc,stroke:#bf9000,color:#000;
+    NET --- SW
+    USB <-->|Ethernet| SW
+    SW <-->|Ethernet / PROFINET| PLC
+    SW <-->|Ethernet / PROFINET| HMI
+    SW <-->|Ethernet| ESXI
 
-    class DEVOPS_IP,ESXI verified;
-    class SIEMENS_IP,PLC,HMI reported;
+    classDef siemens fill:#008A4B,stroke:#006B3C,color:#FFFFFF,stroke-width:2px;
+    classDef network fill:#123B6D,stroke:#08264A,color:#FFFFFF,stroke-width:2px;
+    classDef engineering fill:#1E3A5F,stroke:#102742,color:#FFFFFF,stroke-width:2px;
+    classDef subnet fill:#123B6D,stroke:#008A4B,color:#FFFFFF,stroke-width:3px;
+
+    class PLC,HMI siemens;
+    class SW,ESXI network;
+    class USB,WIN11,TIA,NIC engineering;
+    class NET subnet;
 ```
 
-**Diagram notes:**
+This is a logical topology. Confirm the actual physical port assignments and cable routing in the lab.
 
-- `win11-devops` is a Windows 11 virtual machine running under Oracle VirtualBox.
-- Adapter 1 is bridged to the physical USB Ethernet adapter and connects to the laboratory LAN.
-- Adapter 2 uses VirtualBox NAT for Internet access.
-- The laboratory network and NAT connection serve different purposes.
-- The diagram is a logical representation. The exact physical and virtual switch paths for the PLC, HMI and ESXi host must be confirmed against the actual ESXi network configuration.
-- The `win111-siemens` IP address and industrial device addresses are documented from previous project information; verify them against the current configuration before relying on them operationally.
-
-## 3. IP Address Inventory
+## IP address allocation
 
 | Device | IPv4 address | Subnet mask | Status |
 |---|---|---|---|
-| Windows host laboratory interface | `172.16.10.1` | `255.255.255.0` | Previously reported; verify |
-| Raspberry Pi 5 / ESXi management | `172.16.10.2` | `255.255.255.0` | Previously reported |
-| `win11-devops` — VirtualBox bridged adapter | `172.16.10.5` | `255.255.255.0` | Confirmed by user |
-| `win111-siemens` — Windows VM with TIA Portal | `172.16.10.6` | `255.255.255.0` | Previously reported; verify |
-| Siemens S7-1200 PLC | `172.16.10.7` | `255.255.255.0` | Previously reported; verify |
-| Siemens KTP600 Basic mono PN HMI | `172.16.10.8` | `255.255.255.0` | Previously reported; verify |
-| `win11-devops` — VirtualBox NAT adapter | DHCP-assigned | VirtualBox-managed | Internet connectivity tested; address not recorded |
-| New Linux VMs on ESXi | To be assigned | To be determined | Not yet deployed or assigned |
+| Network address | `172.16.10.0` | `/24` | Network identifier, not a host address |
+| Laptop / ICS interface | `172.16.10.1` | Verify | Previously reported |
+| Raspberry Pi 5 / ESXi management | `172.16.10.2` | Verify | Previously reported |
+| Windows 11 VM `win11-devops` — bridged adapter | `172.16.10.5` | `255.255.255.0` | Confirmed |
+| Windows 11 VM `win11-siemens` | `172.16.10.6` | Verify in guest OS | User-reported |
+| Siemens S7-1200 PLC | `172.16.10.7` | `255.255.255.0` | Confirmed in TIA Portal screenshot |
+| Siemens KTP600 Basic mono PN | `172.16.10.8` | `255.255.255.0` | Confirmed in TIA Portal screenshot |
+| `win11-devops` — VirtualBox NAT adapter | VirtualBox-assigned | VirtualBox-managed | Internet connectivity tested; address not recorded |
+| Additional Linux VM(s) | TBD | TBD | Do not assign an address in documentation until verified |
+| Moxa EDS-205 | No management IP expected | N/A | Unmanaged switch |
 
-Do not assign additional static IP addresses until the current ESXi virtual switch configuration and IP address allocation have been checked.
+For a `/24` network, the broadcast address is `172.16.10.255`. The address `172.16.10.0` is the network address and should not be assigned to a device.
 
-## 4. `win11-devops` Network Configuration
+## PLC and HMI
 
-The `win11-devops` VM is the dedicated development and infrastructure-automation workstation for the project.
+The supplied TIA Portal screenshots show:
 
-### Adapter 1 — Bridged Ethernet
+| Parameter | PLC1 | HMI1 |
+|---|---|---|
+| Model | SIMATIC S7-1200 CPU 1212C DC/DC/DC | KTP600 Basic mono PN |
+| TIA Portal subnet | `PN/IE_1` | `PN/IE_1` |
+| IPv4 address | `172.16.10.7` | `172.16.10.8` |
+| Subnet mask | `255.255.255.0` | `255.255.255.0` |
 
-| Parameter | Value |
-|---|---|
-| VirtualBox mode | Bridged Adapter |
-| Physical interface | USB Ethernet |
-| IPv4 address | `172.16.10.5` |
-| Subnet mask | `255.255.255.0` |
-| Connected subnet | `172.16.10.0/24` |
-| Intended purpose | Access to ESXi and the laboratory network |
-| Connectivity test | Passed |
-
-### Adapter 2 — NAT
+## VirtualBox engineering VM — `win11-siemens`
 
 | Parameter | Value |
 |---|---|
-| VirtualBox mode | NAT |
-| IPv4 address | Assigned by VirtualBox DHCP |
-| Intended purpose | Internet access from the development VM |
-| Connectivity test | `ping www.google.com` passed |
+| VM name | `win11-siemens` |
+| Guest OS | Windows 11 |
+| Software | Siemens TIA Portal V18 |
+| Adapter | Adapter 1 |
+| Network mode | Bridged Adapter |
+| Host interface | TP-LINK Gigabit Ethernet USB Adapter |
+| Virtual cable | Connected option enabled |
 
-The NAT adapter is separate from the bridged laboratory connection. This allows the VM to reach the Internet without requiring the laboratory router to provide Internet access.
+The guest's IP configuration must be checked inside Windows 11 using `ipconfig`. Bridged mode does not mean the guest shares the host's IP address.
 
-**Routing note:** Windows should use the NAT interface for its default Internet route. The bridged laboratory interface should not introduce a competing default gateway unless the network design explicitly requires one. Verify routing with `route print` if connectivity becomes unreliable.
+## VirtualBox DevOps VM — `win11-devops`
 
-## 5. Connectivity Verification
+The `win11-devops` virtual machine is a separate development workstation dedicated to the DevOps part of the `industry-devops-lab` project.
+
+It is distinct from `win11-siemens`. Its purpose is to provide a clean environment for Git, infrastructure as code, PowerShell and project development without changing the existing TIA Portal workstation.
+
+### VM and network configuration
+
+| Parameter | Value |
+|---|---|
+| VM name | `win11-devops` |
+| Guest OS | Windows 11 |
+| Hypervisor | Oracle VirtualBox |
+| Network adapter 1 | Bridged Adapter |
+| Bridged physical interface | USB Ethernet adapter |
+| Bridged IPv4 address | `172.16.10.5` |
+| Bridged subnet mask | `255.255.255.0` |
+| Bridged network | `172.16.10.0/24` |
+| Network adapter 2 | VirtualBox NAT |
+| NAT purpose | Internet access from the VM |
+| Internet connectivity | Tested successfully |
+| Access to ESXi management address | Tested successfully |
+
+The bridged adapter provides access to the laboratory network. The NAT adapter provides a separate path to the Internet because the laboratory network does not provide Internet access.
+
+The NAT adapter's current IPv4 address has not been recorded in this document.
+
+### Installed software and versions
+
+The following software has been installed and its version or execution verified.
+
+| Software | Version | Purpose | Status |
+|---|---|---|---|
+| Git for Windows | `2.56.0.windows.3` | Source control and repository management | Installed and verified |
+| Visual Studio Code | `1.141.2` | Code and configuration editing | Installed and verified |
+| Terraform CLI | `1.16.6` (`windows_amd64`) | Infrastructure as code | Installed and verified |
+| PowerShell 7 | `7.6.8` | Automation and administration scripts | Installed and verified |
+
+The following Visual Studio Code extensions are installed:
+
+| Extension | Extension ID | Status |
+|---|---|---|
+| HashiCorp Terraform | `HashiCorp.terraform` | Installed |
+| Red Hat YAML | `redhat.vscode-yaml` | Installed |
+
+The extension versions have not been recorded.
+
+**Versioning note:** Terraform CLI and the Visual Studio Code Terraform extension are separate components. Installing the extension provides editor support; it does not replace the Terraform CLI.
+
+### Connectivity verification
 
 The following tests have been performed from `win11-devops`.
 
 | Test | Command or method | Result |
 |---|---|---|
-| Connectivity to the laboratory network | `ping` to the Raspberry Pi / ESXi host | Passed |
-| TCP access to ESXi SSH | `Test-NetConnection 172.16.10.2 -Port 22` | `TcpTestSucceeded: True` |
-| Internet connectivity | `ping www.google.com` | Passed |
-| Git installation and execution | `git --version` | Passed |
-| Terraform CLI installation and execution | `terraform version` | Passed |
-| PowerShell 7 installation and execution | `$PSVersionTable.PSVersion` in `pwsh` | Passed |
+| Reachability of Raspberry Pi / ESXi | `ping 172.16.10.2` | Passed |
+| TCP connectivity to ESXi SSH | `Test-NetConnection 172.16.10.2 -Port 22` | `TcpTestSucceeded: True` |
+| Internet connectivity and DNS resolution | `ping www.google.com` | Passed |
+| Git CLI | `git --version` | Passed |
+| Terraform CLI | `terraform version` | Passed |
+| PowerShell 7 | `$PSVersionTable.PSVersion` in `pwsh` | Passed |
 
-The successful SSH port test confirms TCP connectivity to port 22. It does not, by itself, confirm SSH authentication or authorization.
+The successful TCP test confirms connectivity to port 22 on the ESXi management address. It does not, by itself, verify SSH authentication or authorization.
 
-The successful ping to `www.google.com` confirms that DNS resolution and ICMP connectivity worked at the time of the test. It does not guarantee that all Internet services or downloads will be accessible.
+The successful Internet ping confirms that name resolution and ICMP connectivity worked at the time of the test. It does not guarantee that every Internet service is accessible.
 
-## 6. Network Segmentation and Security
+### Routing considerations
 
-The laboratory Ethernet LAN is intended for industrial communication and management access.
+The expected network behavior is:
 
-Security principles:
+- Traffic for `172.16.10.0/24` uses the bridged laboratory interface.
+- General Internet traffic uses the VirtualBox NAT interface.
+- The VM should not route traffic between the bridged interface and NAT.
+- IP forwarding or bridging between the two adapters must not be enabled unless it is explicitly required and documented.
 
-- Do not expose PLC or HMI services directly to the public Internet.
-- Restrict
+The actual routing table and NAT adapter address have not yet been recorded. If routing problems arise, inspect the configuration with:
+
+```powershell
+ipconfig /all
+route print
+```
+
+### Role in the project
+
+The `win11-devops` VM is intended for:
+
+- Git-based source control.
+- Editing Terraform, YAML, PowerShell and other project files.
+- Infrastructure-as-code development and validation.
+- Automation scripts and deployment tooling.
+- Future CI/CD workflow development.
+- Accessing the lab and ESXi management services when required.
+
+The VM is a development workstation. Its presence does not imply that the project's Linux VMs, Docker containers or CI/CD pipeline have already been deployed.
+
+## Proposed switch port allocation
+
+| Moxa EDS-205 port | Proposed connection |
+|---|---|
+| 1 | Siemens S7-1200 PLC |
+| 2 | KTP600 HMI |
+| 3 | Raspberry Pi 5 / ESXi |
+| 4 | Laptop Ethernet adapter |
+| 5 | Spare |
+
+This port allocation is a proposal, not a confirmed as-built record. The EDS-205 is unmanaged; do not assume configurable VLAN support.
+
+The new `win11-devops` VM uses the bridged USB Ethernet interface for laboratory access. Its precise physical cabling and relationship to the existing switch-port allocation should be confirmed against the actual host and VirtualBox configuration.
+
+## Verification checklist
+
+- [ ] Confirm actual mask and gateway on the laptop's USB Ethernet interface.
+- [ ] Run `ipconfig /all` inside `win11-siemens`.
+- [ ] Verify ESXi management IP and mask.
+- [ ] Confirm current physical cable/port assignments.
+- [ ] Test TIA Portal discovery and PLC reachability.
+- [ ] Test HMI-to-PLC communication.
+- [ ] Verify which interface, if any, provides Internet Connection Sharing (ICS).
+- [ ] Record the NAT adapter's IPv4 address in `win11-devops`.
+- [ ] Verify the routing table in `win11-devops` with `route print`.
+- [ ] Record the exact versions of the installed VS Code extensions if required.
+- [ ] Document each additional Linux VM only after it is deployed and its address is confirmed.
+
+## Security
+
+Do not publish passwords, tokens, private keys, VPN credentials or other secrets. Detailed sensitive operational notes belong in a separate private repository.
+
+Keep the DevOps VM's NAT and bridged adapters separate. Do not enable IP forwarding or create a bridge between them unless the network design explicitly requires it.
+
+Do not expose PLC, HMI or ESXi management services directly to the public Internet. Restrict management access to authorized devices and networks.

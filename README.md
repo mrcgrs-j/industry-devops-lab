@@ -1,4 +1,5 @@
 # Industry DevOps Lab
+![Uploading image.png…]()
 
 **Industrial Automation · OT/IT Integration · DevOps · Cloud · Data Engineering**
 
